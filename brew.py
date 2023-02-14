@@ -14,6 +14,14 @@ COLOR_WHITE = [225, 225, 225]
 COLOR_YELLOW = [225, 225, 0]
 COLOR_BROWN = [139, 69, 19]
 
+TYPE_COLOR = {
+        'H': COLOR_DARK_GREEN, # Hops
+        'W': COLOR_BLUE, # Water
+        'Y': COLOR_WHITE, # Yeast
+        'M': COLOR_YELLOW # Malt
+    }
+
+
 class Die:
     def __init__(self) -> None:
         self.size = 6
@@ -23,6 +31,40 @@ class Die:
     def roll(self):
         self.value = randrange(self.size) + 1
         return self.value
+    
+
+class GridBox:
+    def __init__(self, type) -> None:
+        self.rect = None
+        self.val = 0
+        self.type = type
+        self.color = None
+
+
+class Grid:
+    def __init__(self, recipe) -> None:
+        self.grid = [
+            [None, None, None, None, None, None],
+            [None, None, None, None, None, None],
+            [None, None, None, None, None, None],
+            [None, None, None, None, None, None],
+            [None, None, None, None, None, None],
+            [None, None, None, None, None, None]
+        ]
+        for x in range(6):
+            for y in range(6):
+                self.grid[y][x] = GridBox(recipe[y][x])
+                self.grid[y][x].color = TYPE_COLOR[recipe[y][x]]
+
+    def get(self, x, y):
+        return self.grid[y][x]
+    
+    def collidepoint(self, pos):
+        for y in self.grid:
+            for x in y:
+                if x.rect.collidepoint(pos):
+                    return x
+        return None
 
 
 if __name__ == '__main__':
@@ -38,6 +80,7 @@ if __name__ == '__main__':
     bkgrnd = pygame.image.load('background.jpg')
     bkgrnd = pygame.transform.scale(bkgrnd, (WIDTH, HEIGHT))
 
+    # initialize grid
     recipe = [
         ['M', 'M', 'H', 'H', 'Y', 'Y'],
         ['M', 'M', 'H', 'H', 'Y', 'Y'],
@@ -46,13 +89,7 @@ if __name__ == '__main__':
         ['M', 'M', 'H', 'H', 'W', 'W'],
         ['M', 'M', 'H', 'H', 'W', 'W']
     ]
-
-    type_color = {
-        'H': COLOR_DARK_GREEN, # Hops
-        'W': COLOR_BLUE, # Water
-        'Y': COLOR_WHITE, # Yeast
-        'M': COLOR_YELLOW # Malt
-    }
+    grid = Grid(recipe)
 
     # start update loop
     running = True
@@ -64,7 +101,14 @@ if __name__ == '__main__':
         for event in events:
             if event.type == pygame.QUIT:
                 running = False
-        
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                g = grid.collidepoint(pos)
+            if event.type == pygame.MOUSEBUTTONUP:
+                g2 = grid.collidepoint(pos)
+                # if button down hits a box and up occurs in same box 
+                if g is not None and g == g2:
+                    g.val += 1
+
         # draw background
         window.blit(bkgrnd, [0,0])
 
@@ -73,8 +117,9 @@ if __name__ == '__main__':
         for x in range(6):
             for y in range(6):
                 r = upr_left.move(x * GRID_SIZE, y * GRID_SIZE)
-                pygame.draw.rect(window, type_color[recipe[y][x]], r)
-                render = font.render('0', True, COLOR_BLACK)
+                grid.get(x, y).rect = r
+                pygame.draw.rect(window, grid.get(x, y).color, r)
+                render = font.render(str(grid.get(x, y).val), True, COLOR_BLACK)
                 tr = render.get_rect(center=r.center)
                 window.blit(render, tr)
 
