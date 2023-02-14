@@ -3,6 +3,7 @@ import pygame
 
 WIDTH, HEIGHT = 900, 600 # height/width of the game window
 GRID_SIZE = 50 # height/width of a grid box
+DIE_SIZE = 25 # height/width of dice
 
 COLOR_GREY = [150, 150, 150]
 COLOR_RED = [225, 0, 0]
@@ -23,20 +24,37 @@ TYPE_COLOR = {
 
 
 class Die:
-    def __init__(self) -> None:
+    def __init__(self, type) -> None:
+        self.rect = None
+        self.value = 0
         self.size = 6
-        self.type = 'Hops'
-        self.value = None
+        self.type = type
+        self.color = None
+        self.roll()
 
     def roll(self):
         self.value = randrange(self.size) + 1
         return self.value
     
 
+class DicePool:
+    def __init__(self) -> None:
+        self.pool = [None, None, None]
+        for x in range(3):
+            self.pool[x] = Die('H')
+            self.pool[x].color = TYPE_COLOR[self.pool[x].type]
+
+    def collidepoint(self, pos):
+        for d in self.pool:
+            if d.rect.collidepoint(pos):
+                return d
+        return None
+    
+
 class GridBox:
     def __init__(self, type) -> None:
         self.rect = None
-        self.val = 0
+        self.value = 0
         self.type = type
         self.color = None
 
@@ -72,9 +90,10 @@ if __name__ == '__main__':
     window = pygame.display.set_mode((WIDTH, HEIGHT)) 
     pygame.display.set_caption('Brewl') 
 
-    # initialize font
+    # initialize fonts
     pygame.font.init()
     font = pygame.font.SysFont('Algerian', 18)
+    font2 = pygame.font.SysFont('Algerian', 12)
 
     # resize background image
     bkgrnd = pygame.image.load('background.jpg')
@@ -91,6 +110,9 @@ if __name__ == '__main__':
     ]
     grid = Grid(recipe)
 
+    # initialize dice
+    dice = DicePool()
+
     # start update loop
     running = True
     while running:
@@ -103,11 +125,15 @@ if __name__ == '__main__':
                 running = False
             if event.type == pygame.MOUSEBUTTONDOWN:
                 g = grid.collidepoint(pos)
+                p = dice.collidepoint(pos)
             if event.type == pygame.MOUSEBUTTONUP:
                 g2 = grid.collidepoint(pos)
+                p2 = dice.collidepoint(pos)
                 # if button down hits a box and up occurs in same box 
                 if g is not None and g == g2:
-                    g.val += 1
+                    g.value += 1
+                if p is not None and p == p2:
+                    p.roll()
 
         # draw background
         window.blit(bkgrnd, [0,0])
@@ -119,7 +145,7 @@ if __name__ == '__main__':
                 r = upr_left.move(x * GRID_SIZE, y * GRID_SIZE)
                 grid.get(x, y).rect = r
                 pygame.draw.rect(window, grid.get(x, y).color, r)
-                render = font.render(str(grid.get(x, y).val), True, COLOR_BLACK)
+                render = font.render(str(grid.get(x, y).value), True, COLOR_BLACK)
                 tr = render.get_rect(center=r.center)
                 window.blit(render, tr)
 
@@ -133,7 +159,19 @@ if __name__ == '__main__':
             start = [upr_left[0] + GRID_SIZE * l, upr_left[1]]
             end = [start[0], start[1] + GRID_SIZE * 6]
             pygame.draw.line(window, COLOR_BLACK, start, end)
-        
+
+        # draw dice
+        x = 1
+        for d in dice.pool:
+            r = pygame.Rect((grid.get(0, 5).rect[0] + GRID_SIZE * x - DIE_SIZE // 2, grid.get(0, 5).rect[1] + GRID_SIZE * 2, DIE_SIZE, DIE_SIZE))
+            d.rect = r
+            pygame.draw.rect(window, d.color, r)
+            pygame.draw.rect(window, COLOR_BLACK, r, 1)
+            render = font.render(str(d.value), True, COLOR_BLACK)
+            tr = render.get_rect(center=r.center)
+            window.blit(render, tr)
+            x += 2
+
         # write column headers centered on each zone
         headers = ['Mash', 'Boil', 'Ferment']
         x = 1
