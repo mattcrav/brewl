@@ -29,7 +29,10 @@ if __name__ == '__main__':
     # initialize client
     window = pygame.display.set_mode((WIDTH, HEIGHT)) 
     pygame.display.set_caption('Brewl') 
+
+    # initialize font
     pygame.font.init()
+    font = pygame.font.SysFont('Algerian', 18)
 
     # resize background image
     bkgrnd = pygame.image.load('background.jpg')
@@ -54,6 +57,7 @@ if __name__ == '__main__':
     # start update loop
     running = True
     while running:
+
         # get events
         events = pygame.event.get()
         pos = pygame.mouse.get_pos()
@@ -64,34 +68,34 @@ if __name__ == '__main__':
         # draw background
         window.blit(bkgrnd, [0,0])
 
-        # draw and color grid boxes based on recipe
-        start = [(WIDTH / 2) - GRID_SIZE * 3, (HEIGHT / 2) - GRID_SIZE * 3]
-        pos = [0, 0]
+        # draw grid boxes starting with the upper left
+        upr_left = pygame.Rect([(WIDTH // 2) - GRID_SIZE * 3, (HEIGHT // 2) - GRID_SIZE * 3, GRID_SIZE, GRID_SIZE])
         for x in range(6):
-            pos[0] = start[0]
-            pos[1] = start[1] + GRID_SIZE * x
             for y in range(6):
-                pos[0] = start[0] + GRID_SIZE * y
-                pygame.draw.rect(window, type_color[recipe[x][y]], pos + [GRID_SIZE, GRID_SIZE])
+                r = upr_left.move(x * GRID_SIZE, y * GRID_SIZE)
+                pygame.draw.rect(window, type_color[recipe[y][x]], r)
+                render = font.render('0', True, COLOR_BLACK)
+                tr = render.get_rect(center=r.center)
+                window.blit(render, tr)
 
         # draw grid lines
         for l in range(7):
-            pos[0] = start[0]
-            pos[1] = start[1] + GRID_SIZE * l
-            pygame.draw.line(window, COLOR_BLACK, pos, [pos[0] + GRID_SIZE * 6, pos[1]])
-            pos[0] = start[0] + GRID_SIZE * l
-            pos[1] = start[1]
-            pygame.draw.line(window, COLOR_BLACK, pos, [pos[0], pos[1] + GRID_SIZE * 6])
+            # horizontal
+            start = [upr_left[0], upr_left[1] + GRID_SIZE * l]
+            end = [start[0] + GRID_SIZE * 6, start[1]]
+            pygame.draw.line(window, COLOR_BLACK, start, end)
+            # vertical
+            start = [upr_left[0] + GRID_SIZE * l, upr_left[1]]
+            end = [start[0], start[1] + GRID_SIZE * 6]
+            pygame.draw.line(window, COLOR_BLACK, start, end)
         
         # write column headers centered on each zone
-        font = pygame.font.SysFont('Algerian', 18)
-        headers = ['      Mash', '      Boil', '      Ferm']
-        x = 0
+        headers = ['Mash', 'Boil', 'Ferment']
+        x = 1
         for h in headers:
-            render = font.render(h, False, COLOR_WHITE)
-            pos[0] = start[0] + GRID_SIZE * x
-            pos[1] = start[1] - GRID_SIZE / 2
-            window.blit(render, pos)
+            render = font.render(h, True, COLOR_WHITE)
+            r = render.get_rect(center=(upr_left[0] + GRID_SIZE * x, upr_left[1] - GRID_SIZE // 2))
+            window.blit(render, r)
             x += 2
 
         # update display
