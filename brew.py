@@ -41,11 +41,11 @@ class DicePool:
     def __init__(self) -> None:
         self.pool = []
         self.selected = None
-        for x in range(3):
+        for x in range(18):
             d = Die('H')
             d.color = TYPE_COLOR[d.type]
             self.pool.append(d)
-        for x in range(3):
+        for x in range(18):
             d = Die('W')
             d.color = TYPE_COLOR[d.type]
             self.pool.append(d)
@@ -83,6 +83,7 @@ class GridBox:
 class Grid:
     def __init__(self, recipe) -> None:
         self.active = 0
+        self.active_cnt = 0
         self.grid = [
             [None, None, None, None, None, None],
             [None, None, None, None, None, None],
@@ -98,7 +99,16 @@ class Grid:
 
     def get(self, x, y):
         return self.grid[y][x]
-    
+
+    def score(self, row=None):
+        if row is not None:
+            return sum([x.get_val() for x in self.grid[row]])
+        else:
+            val = 0
+            for x in range(6):
+                val += self.score(x)
+            return val
+
     def collidepoint(self, pos):
         for y in self.grid:
             for x in y:
@@ -123,6 +133,11 @@ class Screen:
         self.clicked = None
         self.played = False
 
+    def write_text(self, text, rect, color, font):
+        render = font.render(text, True, color)
+        tr = render.get_rect(center=rect.center)
+        return (render, tr)
+        
     def get_click(self, pos):
         c = None
         if self.endturn.collidepoint(pos):
@@ -177,6 +192,12 @@ if __name__ == '__main__':
                         scrn.dice.selected = None
                         scrn.dice.pool.remove(o.die)
                         scrn.dice.active.remove(o.die)
+                        if len(scrn.dice.active) == 0:
+                            o = scrn.endturn
+                        scrn.grid.active_cnt += 1
+                        if scrn.grid.active_cnt == 6:
+                            scrn.grid.active_cnt = 0
+                            scrn.grid.active += 1
                 if isinstance(o, Die):
                     scrn.dice.selected = o
                 if o == scrn.endturn and scrn.played:
@@ -187,19 +208,28 @@ if __name__ == '__main__':
         # draw background
         window.blit(bkgrnd, [0,0])
 
-        # draw grid boxes starting with the upper left
+        # get location of upper left box, centering grid in window
         upr_left = pygame.Rect([(WIDTH // 2) - GRID_SIZE * 3, (HEIGHT // 2) - GRID_SIZE * 3, GRID_SIZE, GRID_SIZE])
+
         for x in range(6):
+            # draw scoring column
+            window.blit(*scrn.write_text(str(scrn.grid.score(x)), upr_left.move(-int(GRID_SIZE * 1.5), x * GRID_SIZE), COLOR_WHITE, font))
+
+            # draw grid box
             for y in range(6):
                 r = upr_left.move(x * GRID_SIZE, y * GRID_SIZE)
                 scrn.grid.get(x, y).rect = r
                 pygame.draw.rect(window, scrn.grid.get(x, y).color, r)
                 if x == scrn.grid.active:
-                    render = font.render(str(scrn.grid.get(x, y).get_val()), True, COLOR_RED)
+                    window.blit(*scrn.write_text(str(scrn.grid.get(x, y).get_val()), r, COLOR_RED, font))
                 else:
-                    render = font.render(str(scrn.grid.get(x, y).get_val()), True, COLOR_BLACK)
-                tr = render.get_rect(center=r.center)
-                window.blit(render, tr)
+                    window.blit(*scrn.write_text(str(scrn.grid.get(x, y).get_val()), r, COLOR_BLACK, font))
+
+        # draw score total
+        start = [upr_left[0] - int(GRID_SIZE * 1.5), upr_left[1] + GRID_SIZE * 6]
+        end = [upr_left[0] - int(GRID_SIZE * 0.5), upr_left[1] + GRID_SIZE * 6]
+        pygame.draw.line(window, COLOR_WHITE, start, end)
+        window.blit(*scrn.write_text(str(scrn.grid.score()), upr_left.move(-int(GRID_SIZE * 1.5), 6 * GRID_SIZE), COLOR_WHITE, font))
 
         # draw grid lines
         for l in range(7):
@@ -219,14 +249,12 @@ if __name__ == '__main__':
             d.rect = r
             pygame.draw.rect(window, d.color, r)
             pygame.draw.rect(window, COLOR_BLACK, r, 1)
-            render = font.render(str(d.value), True, COLOR_BLACK)
-            tr = render.get_rect(center=r.center)
-            window.blit(render, tr)
+            window.blit(*scrn.write_text(str(d.value), r, COLOR_BLACK, font2))
             x += 2
 
         # write column headers centered on each zone
-        headers = ['Mash', 'Boil', 'Ferment']
-        x = 1
+        headers = ['Score', 'Mash', 'Boil', 'Ferment']
+        x = -1
         for h in headers:
             render = font.render(h, True, COLOR_WHITE)
             r = render.get_rect(center=(upr_left[0] + GRID_SIZE * x, upr_left[1] - GRID_SIZE // 2))
@@ -237,9 +265,7 @@ if __name__ == '__main__':
         scrn.endturn = pygame.Rect(GRID_SIZE, HEIGHT - GRID_SIZE, GRID_SIZE, DIE_SIZE)
         pygame.draw.rect(window, COLOR_GREEN, scrn.endturn)
         pygame.draw.rect(window, COLOR_BLACK, scrn.endturn, 1)
-        render = font2.render('End', True, COLOR_BLACK)
-        tr = render.get_rect(center=scrn.endturn.center)
-        window.blit(render, tr)
+        window.blit(*scrn.write_text('End', scrn.endturn, COLOR_BLACK, font2))
 
         # update display
         pygame.display.update()
