@@ -19,7 +19,8 @@ TYPE_COLOR = {
         'H': COLOR_DARK_GREEN, # Hops
         'W': COLOR_BLUE, # Water
         'Y': COLOR_WHITE, # Yeast
-        'M': COLOR_YELLOW # Malt
+        'M': COLOR_YELLOW, # Malt
+        'O': COLOR_RED # Off Flavor
     }
 
 
@@ -30,7 +31,6 @@ class Die:
         self.size = 6
         self.type = type
         self.color = None
-        self.roll()
 
     def roll(self):
         self.value = randrange(self.size) + 1
@@ -41,14 +41,20 @@ class DicePool:
     def __init__(self) -> None:
         self.pool = []
         self.selected = None
-        for x in range(18):
-            d = Die('H')
-            d.color = TYPE_COLOR[d.type]
-            self.pool.append(d)
-        for x in range(18):
+        hops1 = [Die('H'), Die('H'), Die('O'), Die('O')]
+        hops2 = [Die('H'), Die('H'), Die('O'), Die('O')]
+        malt1 = [Die('M'), Die('M'), Die('O'), Die('O')]
+        malt2 = [Die('M'), Die('M'), Die('O'), Die('O')]
+        yeast = [Die('Y'), Die('Y'), Die('O'), Die('O')]
+        ingredients = hops1 + hops2 + malt1 + malt2 + yeast
+        for i in ingredients:
+            i.color = TYPE_COLOR[i.type]
+            self.pool.append(i)
+        for x in range(36 - len(ingredients)):
             d = Die('W')
             d.color = TYPE_COLOR[d.type]
             self.pool.append(d)
+        self.shuffle()
         self.active = self.pool[:3]
 
     def shuffle(self):
@@ -76,7 +82,10 @@ class GridBox:
     def get_val(self):
         self.value = 0
         if self.die is not None:
-            self.value = self.die.value
+            if self.die.type == self.type:
+                self.value = self.die.value
+            if self.die.type == 'O' and self.type == 'W':
+                self.value = -self.die.value
         return self.value
 
 
@@ -215,15 +224,26 @@ if __name__ == '__main__':
             # draw scoring column
             window.blit(*scrn.write_text(str(scrn.grid.score(x)), upr_left.move(-int(GRID_SIZE * 1.5), x * GRID_SIZE), COLOR_WHITE, font))
 
-            # draw grid box
             for y in range(6):
+                # draw grid box
                 r = upr_left.move(x * GRID_SIZE, y * GRID_SIZE)
                 scrn.grid.get(x, y).rect = r
                 pygame.draw.rect(window, scrn.grid.get(x, y).color, r)
-                if x == scrn.grid.active:
-                    window.blit(*scrn.write_text(str(scrn.grid.get(x, y).get_val()), r, COLOR_RED, font))
+
+                # draw score in upper left
+                if x == scrn.grid.active and scrn.grid.get(x, y).die is None:
+                    c = COLOR_RED
                 else:
-                    window.blit(*scrn.write_text(str(scrn.grid.get(x, y).get_val()), r, COLOR_BLACK, font))
+                    c = COLOR_BLACK
+                render = font2.render(str(scrn.grid.get(x, y).get_val()), True, c)
+                window.blit(render, r.move(5,0))
+
+                # draw die in box
+                if scrn.grid.get(x, y).die is not None:
+                    r = r.inflate(-DIE_SIZE, -DIE_SIZE)
+                    pygame.draw.rect(window, scrn.grid.get(x, y).die.color, r)
+                    pygame.draw.rect(window, COLOR_BLACK, r, 1)
+                    window.blit(*scrn.write_text(str(scrn.grid.get(x, y).die.value), r, COLOR_BLACK, font))
 
         # draw score total
         start = [upr_left[0] - int(GRID_SIZE * 1.5), upr_left[1] + GRID_SIZE * 6]
@@ -236,11 +256,19 @@ if __name__ == '__main__':
             # horizontal
             start = [upr_left[0], upr_left[1] + GRID_SIZE * l]
             end = [start[0] + GRID_SIZE * 6, start[1]]
-            pygame.draw.line(window, COLOR_BLACK, start, end)
+            if l == 0 or l == 6:
+                w = 5
+            else:
+                w = 1
+            pygame.draw.line(window, COLOR_BLACK, start, end, w)
             # vertical
             start = [upr_left[0] + GRID_SIZE * l, upr_left[1]]
             end = [start[0], start[1] + GRID_SIZE * 6]
-            pygame.draw.line(window, COLOR_BLACK, start, end)
+            if l % 2 == 0:
+                w = 5
+            else:
+                w = 1
+            pygame.draw.line(window, COLOR_BLACK, start, end, w)
 
         # draw dice
         x = 1
@@ -249,7 +277,7 @@ if __name__ == '__main__':
             d.rect = r
             pygame.draw.rect(window, d.color, r)
             pygame.draw.rect(window, COLOR_BLACK, r, 1)
-            window.blit(*scrn.write_text(str(d.value), r, COLOR_BLACK, font2))
+            window.blit(*scrn.write_text(str(d.value), r, COLOR_BLACK, font))
             x += 2
 
         # write column headers centered on each zone
