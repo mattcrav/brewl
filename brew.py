@@ -1,4 +1,4 @@
-from random import randrange
+from random import randrange, shuffle
 import pygame
 
 WIDTH, HEIGHT = 900, 600 # height/width of the game window
@@ -39,14 +39,25 @@ class Die:
 
 class DicePool:
     def __init__(self) -> None:
-        self.pool = [None, None, None]
+        self.pool = []
         self.selected = None
         for x in range(3):
-            self.pool[x] = Die('H')
-            self.pool[x].color = TYPE_COLOR[self.pool[x].type]
+            d = Die('H')
+            d.color = TYPE_COLOR[d.type]
+            self.pool.append(d)
+        for x in range(3):
+            d = Die('W')
+            d.color = TYPE_COLOR[d.type]
+            self.pool.append(d)
+        self.active = self.pool[:3]
+
+    def shuffle(self):
+        for d in self.pool:
+            d.roll()
+        shuffle(self.pool)
 
     def collidepoint(self, pos):
-        for d in self.pool:
+        for d in self.active:
             if d.rect.collidepoint(pos):
                 return d
         return None
@@ -96,6 +107,38 @@ class Grid:
         return None
 
 
+class Screen:
+    def __init__(self) -> None:
+        recipe = [
+            ['M', 'M', 'H', 'H', 'Y', 'Y'],
+            ['M', 'M', 'H', 'H', 'Y', 'Y'],
+            ['W', 'W', 'W', 'W', 'W', 'W'],
+            ['W', 'W', 'W', 'W', 'W', 'W'],
+            ['M', 'M', 'H', 'H', 'W', 'W'],
+            ['M', 'M', 'H', 'H', 'W', 'W']
+        ]
+        self.grid = Grid(recipe)
+        self.dice = DicePool()
+        self.endturn = None
+        self.clicked = None
+        self.played = False
+
+    def get_click(self, pos):
+        c = None
+        if self.endturn.collidepoint(pos):
+            c = self.endturn
+        g = self.grid.collidepoint(pos)
+        if g is not None:
+            c = g
+        p = self.dice.collidepoint(pos)
+        if p is not None:
+            c = p
+        if c is not None and self.clicked == c:
+            self.clicked = None
+            return c
+        else:
+            self.clicked = c
+
 if __name__ == '__main__':
     # initialize client
     window = pygame.display.set_mode((WIDTH, HEIGHT)) 
@@ -110,19 +153,8 @@ if __name__ == '__main__':
     bkgrnd = pygame.image.load('background.jpg')
     bkgrnd = pygame.transform.scale(bkgrnd, (WIDTH, HEIGHT))
 
-    # initialize grid
-    recipe = [
-        ['M', 'M', 'H', 'H', 'Y', 'Y'],
-        ['M', 'M', 'H', 'H', 'Y', 'Y'],
-        ['W', 'W', 'W', 'W', 'W', 'W'],
-        ['W', 'W', 'W', 'W', 'W', 'W'],
-        ['M', 'M', 'H', 'H', 'W', 'W'],
-        ['M', 'M', 'H', 'H', 'W', 'W']
-    ]
-    grid = Grid(recipe)
-
-    # initialize dice
-    dice = DicePool()
+    # initialize screen
+    scrn = Screen()
 
     # start update loop
     running = True
@@ -135,19 +167,22 @@ if __name__ == '__main__':
             if event.type == pygame.QUIT:
                 running = False
             if event.type == pygame.MOUSEBUTTONDOWN:
-                g = grid.collidepoint(pos)
-                p = dice.collidepoint(pos)
+                scrn.get_click(pos)
             if event.type == pygame.MOUSEBUTTONUP:
-                g2 = grid.collidepoint(pos)
-                p2 = dice.collidepoint(pos)
-                # if button down hits a box and up occurs in same box 
-                if g is not None and g == g2:
-                    if g.die is None and dice.selected is not None and grid.active == g.x:
-                        g.die = dice.selected
-                        dice.selected = None
-                        dice.pool.remove(g.die)
-                if p is not None and p == p2:
-                    dice.selected = p
+                o = scrn.get_click(pos)
+                if isinstance(o, GridBox):
+                    if o.die is None and scrn.dice.selected is not None and scrn.grid.active == o.x:
+                        o.die = scrn.dice.selected
+                        scrn.played = True
+                        scrn.dice.selected = None
+                        scrn.dice.pool.remove(o.die)
+                        scrn.dice.active.remove(o.die)
+                if isinstance(o, Die):
+                    scrn.dice.selected = o
+                if o == scrn.endturn and scrn.played:
+                    scrn.played = False
+                    scrn.dice.shuffle()
+                    scrn.dice.active = scrn.dice.pool[:3]
 
         # draw background
         window.blit(bkgrnd, [0,0])
@@ -157,12 +192,12 @@ if __name__ == '__main__':
         for x in range(6):
             for y in range(6):
                 r = upr_left.move(x * GRID_SIZE, y * GRID_SIZE)
-                grid.get(x, y).rect = r
-                pygame.draw.rect(window, grid.get(x, y).color, r)
-                if x == grid.active:
-                    render = font.render(str(grid.get(x, y).get_val()), True, COLOR_RED)
+                scrn.grid.get(x, y).rect = r
+                pygame.draw.rect(window, scrn.grid.get(x, y).color, r)
+                if x == scrn.grid.active:
+                    render = font.render(str(scrn.grid.get(x, y).get_val()), True, COLOR_RED)
                 else:
-                    render = font.render(str(grid.get(x, y).get_val()), True, COLOR_BLACK)
+                    render = font.render(str(scrn.grid.get(x, y).get_val()), True, COLOR_BLACK)
                 tr = render.get_rect(center=r.center)
                 window.blit(render, tr)
 
@@ -179,8 +214,8 @@ if __name__ == '__main__':
 
         # draw dice
         x = 1
-        for d in dice.pool:
-            r = pygame.Rect((grid.get(0, 5).rect[0] + GRID_SIZE * x - DIE_SIZE // 2, grid.get(0, 5).rect[1] + GRID_SIZE * 2, DIE_SIZE, DIE_SIZE))
+        for d in scrn.dice.active:
+            r = pygame.Rect((scrn.grid.get(0, 5).rect[0] + GRID_SIZE * x - DIE_SIZE // 2, scrn.grid.get(0, 5).rect[1] + GRID_SIZE * 2, DIE_SIZE, DIE_SIZE))
             d.rect = r
             pygame.draw.rect(window, d.color, r)
             pygame.draw.rect(window, COLOR_BLACK, r, 1)
@@ -197,6 +232,14 @@ if __name__ == '__main__':
             r = render.get_rect(center=(upr_left[0] + GRID_SIZE * x, upr_left[1] - GRID_SIZE // 2))
             window.blit(render, r)
             x += 2
+
+        # draw end turn button
+        scrn.endturn = pygame.Rect(GRID_SIZE, HEIGHT - GRID_SIZE, GRID_SIZE, DIE_SIZE)
+        pygame.draw.rect(window, COLOR_GREEN, scrn.endturn)
+        pygame.draw.rect(window, COLOR_BLACK, scrn.endturn, 1)
+        render = font2.render('End', True, COLOR_BLACK)
+        tr = render.get_rect(center=scrn.endturn.center)
+        window.blit(render, tr)
 
         # update display
         pygame.display.update()
