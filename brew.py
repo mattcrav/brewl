@@ -40,6 +40,7 @@ class Die:
 class DicePool:
     def __init__(self) -> None:
         self.pool = [None, None, None]
+        self.selected = None
         for x in range(3):
             self.pool[x] = Die('H')
             self.pool[x].color = TYPE_COLOR[self.pool[x].type]
@@ -52,15 +53,25 @@ class DicePool:
     
 
 class GridBox:
-    def __init__(self, type) -> None:
+    def __init__(self, type, x, y) -> None:
+        self.x = x
+        self.y = y
         self.rect = None
         self.value = 0
         self.type = type
         self.color = None
+        self.die = None
+
+    def get_val(self):
+        self.value = 0
+        if self.die is not None:
+            self.value = self.die.value
+        return self.value
 
 
 class Grid:
     def __init__(self, recipe) -> None:
+        self.active = 0
         self.grid = [
             [None, None, None, None, None, None],
             [None, None, None, None, None, None],
@@ -71,7 +82,7 @@ class Grid:
         ]
         for x in range(6):
             for y in range(6):
-                self.grid[y][x] = GridBox(recipe[y][x])
+                self.grid[y][x] = GridBox(recipe[y][x], x, y)
                 self.grid[y][x].color = TYPE_COLOR[recipe[y][x]]
 
     def get(self, x, y):
@@ -131,9 +142,12 @@ if __name__ == '__main__':
                 p2 = dice.collidepoint(pos)
                 # if button down hits a box and up occurs in same box 
                 if g is not None and g == g2:
-                    g.value += 1
+                    if g.die is None and dice.selected is not None and grid.active == g.x:
+                        g.die = dice.selected
+                        dice.selected = None
+                        dice.pool.remove(g.die)
                 if p is not None and p == p2:
-                    p.roll()
+                    dice.selected = p
 
         # draw background
         window.blit(bkgrnd, [0,0])
@@ -145,7 +159,10 @@ if __name__ == '__main__':
                 r = upr_left.move(x * GRID_SIZE, y * GRID_SIZE)
                 grid.get(x, y).rect = r
                 pygame.draw.rect(window, grid.get(x, y).color, r)
-                render = font.render(str(grid.get(x, y).value), True, COLOR_BLACK)
+                if x == grid.active:
+                    render = font.render(str(grid.get(x, y).get_val()), True, COLOR_RED)
+                else:
+                    render = font.render(str(grid.get(x, y).get_val()), True, COLOR_BLACK)
                 tr = render.get_rect(center=r.center)
                 window.blit(render, tr)
 
