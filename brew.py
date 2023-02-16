@@ -156,8 +156,12 @@ class Screen:
         ]
         self.grid = Grid(recipe)
         self.dice = DicePool()
+        self.bill_r = None
+        self.bill_i = None
+        self.bill()
         self.endturn = None
         self.clicked = None
+        
         self.played = False
 
     def write_text(self, text, rect, color, font):
@@ -180,6 +184,17 @@ class Screen:
             return c
         else:
             self.clicked = c
+
+    def bill(self):
+        self.bill_r = {'H': 0, 'M': 0, 'Y': 0, 'W': 0, 'O': 0}
+        self.bill_i = self.bill_r.copy()
+        for x in range(6):
+            for y in range(6):
+                if self.grid.grid[y][x].die is None:
+                    self.bill_r[self.grid.grid[y][x].type] += 1
+        for d in self.dice.pool:
+            self.bill_i[d.type] += 1
+
 
 if __name__ == '__main__':
     # initialize client
@@ -226,6 +241,7 @@ if __name__ == '__main__':
                         if scrn.grid.active_cnt == 6:
                             scrn.grid.active_cnt = 0
                             scrn.grid.active += 1
+                        scrn.bill()
                 if isinstance(o, Die):
                     scrn.dice.selected = o
                 if o == scrn.endturn and scrn.played:
@@ -266,17 +282,19 @@ if __name__ == '__main__':
                     pygame.draw.rect(window, COLOR_BLACK, r, 1)
                     window.blit(*scrn.write_text(str(scrn.grid.get(x, y).die.value), r, COLOR_BLACK, font))
 
-        # draw score total
+        # draw quality total
         start = [upr_left[0] + int(GRID_SIZE * 6.5), upr_left[1] + GRID_SIZE * 6]
         end = [upr_left[0] + int(GRID_SIZE * 7.5), upr_left[1] + GRID_SIZE * 6]
         pygame.draw.line(window, COLOR_WHITE, start, end)
         window.blit(*scrn.write_text(str(scrn.grid.score()), upr_left.move(int(GRID_SIZE * 6.5), 6 * GRID_SIZE), COLOR_WHITE, font))
 
+        # draw craft total
         start = [upr_left[0] + int(GRID_SIZE * 8.5), upr_left[1] + GRID_SIZE * 6]
         end = [upr_left[0] + int(GRID_SIZE * 9.5), upr_left[1] + GRID_SIZE * 6]
         pygame.draw.line(window, COLOR_WHITE, start, end)
         window.blit(*scrn.write_text(str(scrn.grid.craft()) + '%', upr_left.move(int(GRID_SIZE * 8.5), 6 * GRID_SIZE), COLOR_WHITE, font))
 
+        # draw combined total
         window.blit(*scrn.write_text(str(scrn.grid.total()), upr_left.move(int(GRID_SIZE * 7.5), 7 * GRID_SIZE), COLOR_WHITE, font3))
 
         # draw grid lines
@@ -302,13 +320,22 @@ if __name__ == '__main__':
             x += 2
 
         # write column headers centered on each zone
-        headers = ['Mash', 'Boil', 'Ferment', 'Quality', 'Craft']
-        x = 1
+        headers = ['Bill', 'Mash', 'Boil', 'Ferment', 'Quality', 'Craft']
+        x = -1
         for h in headers:
             render = font.render(h, True, COLOR_WHITE)
             r = render.get_rect(center=(upr_left[0] + GRID_SIZE * x, upr_left[1] - GRID_SIZE // 2))
             window.blit(render, r)
             x += 2
+
+        # draw bill of ingredients
+        pygame.draw.rect(window, COLOR_BLACK, (upr_left[0] - 2 * GRID_SIZE + 10, upr_left[1], GRID_SIZE * 2 - 20, DIE_SIZE * 10))
+        y = 1
+        for i in scrn.bill_r:
+            render = font2.render(f'{scrn.bill_r[i]} ({scrn.bill_i[i]})', True, TYPE_COLOR[i])
+            r = render.get_rect(center=(upr_left[0] - GRID_SIZE, upr_left[1] + y * DIE_SIZE))
+            window.blit(render, r)
+            y += 2
 
         # draw end turn button and efficiency score
         scrn.endturn = pygame.Rect(GRID_SIZE, HEIGHT - GRID_SIZE, GRID_SIZE, DIE_SIZE)
